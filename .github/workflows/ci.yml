@@ -1,0 +1,37 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build deps
+        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build g++ golang-go
+
+      - name: Configure ASAN
+        run: cmake -S . -B build -G Ninja -DQUANTCORE_ENABLE_ASAN=ON
+
+      - name: Build ASAN
+        run: cmake --build build
+
+      - name: Test ASAN
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Configure release for Go
+        run: cmake -S . -B build-release -G Ninja -DQUANTCORE_ENABLE_ASAN=OFF
+
+      - name: Build release
+        run: cmake --build build-release
+
+      - name: Go tests
+        run: |
+          cd go
+          go test ./...
+
+      - name: Benchmark smoke
+        run: ./build/bench_gemm
