@@ -1,6 +1,8 @@
 #include "quantcore/binary_gemm.hpp"
 #include "quantcore/blocking.hpp"
+#include "quantcore/c_api.h"
 #include "quantcore/ternary_gemm.hpp"
+#include "quantcore/version.hpp"
 
 #include <algorithm>
 #include <cstddef>
@@ -23,7 +25,11 @@ bool avx2_supported() {
 
 bool avx512f_supported() {
 #if defined(__x86_64__) || defined(_M_X64)
+#if QC_ENABLE_AVX512
     return __builtin_cpu_supports("avx512f") != 0;
+#else
+    return false;
+#endif
 #else
     return false;
 #endif
@@ -31,7 +37,11 @@ bool avx512f_supported() {
 
 bool avx512vpopcntdq_supported() {
 #if defined(__x86_64__) || defined(_M_X64)
+#if QC_ENABLE_AVX512
     return __builtin_cpu_supports("avx512vpopcntdq") != 0;
+#else
+    return false;
+#endif
 #else
     return false;
 #endif
@@ -39,7 +49,11 @@ bool avx512vpopcntdq_supported() {
 
 bool amx_tile_supported() {
 #if defined(__x86_64__) || defined(_M_X64)
+#if QC_ENABLE_AMX
     return __builtin_cpu_supports("amx-tile") != 0;
+#else
+    return false;
+#endif
 #else
     return false;
 #endif
@@ -109,6 +123,8 @@ void ternary_gemm(const PackedTernaryMatrix& a, const PackedTernaryMatrix& b, st
 }  // namespace quantcore
 
 extern "C" {
+
+const char* qc_version(void) { return quantcore::kVersion; }
 
 void qc_binary_gemm(std::size_t m, std::size_t n, std::size_t k, const std::uint64_t* a_data,
                     const std::uint64_t* b_data, std::int32_t* c_data) {

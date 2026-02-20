@@ -16,10 +16,3 @@ void ternary_gemm(const PackedTernaryMatrix& a, const PackedTernaryMatrix& b, st
                   bool use_threads = false);
 
 }  // namespace quantcore
-
-extern "C" {
-
-void qc_ternary_gemm(std::size_t m, std::size_t n, std::size_t k, const std::uint64_t* a_pos, const std::uint64_t* a_neg,
-                     const std::uint64_t* b_pos, const std::uint64_t* b_neg, std::int32_t* c_data);
-
-}

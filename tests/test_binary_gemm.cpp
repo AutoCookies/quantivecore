@@ -1,9 +1,11 @@
 #include <catch2/catch_test_macros.hpp>
 
+#include <string>
 #include <vector>
 
 #include "quantcore/binary_gemm.hpp"
 #include "quantcore/blocking.hpp"
+#include "quantcore/c_api.h"
 
 namespace {
 
@@ -136,4 +138,9 @@ TEST_CASE("autotune updates strategy sanely", "[binary][tuning]") {
     REQUIRE(after.kb_blocks == tuned.kb_blocks);
 
     quantcore::set_blocking_strategy(before);
+}
+
+
+TEST_CASE("c api version is 1.0.0", "[binary][version]") {
+    REQUIRE(std::string(qc_version()) == std::string("1.0.0"));
 }

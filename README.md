@@ -1,44 +1,58 @@
-# QuantCore
+# QuantCore v1.0.0
 
-QuantCore is a bit-level GEMM/GEMV engine for binary (1-bit) and ternary (2-plane) math.
+Production-grade bit-level GEMM engine (binary/ternary) with stable C ABI.
 
-## Phase 4 Highlights
+## Stable ABI
 
-- Runtime auto-tuner for cache blocking (`MB/NB/KB_blocks`) with deterministic median timing search.
-- Runtime micro-architecture profile capture in benchmark (`/proc/cpuinfo` model reporting).
-- Roofline-oriented reporting with arithmetic intensity + measured memory bandwidth probe.
-- Hardened dispatch path with explicit dimension validation and safe ISA fallback chain.
-- CI performance regression gate with latency ceilings and dominance checks.
+Only `include/quantcore/c_api.h` is ABI-stable for 1.x.
 
-## ISA Matrix
+Exported symbols:
+- `qc_version`
+- `qc_binary_gemm`
+- `qc_ternary_gemm`
 
-| ISA | Status |
-| --- | --- |
-| Scalar | ✅ reference |
-| AVX2 | ✅ |
-| AVX-512F | ✅ |
-| AVX-512VPOPCNTDQ | ✅ when available |
-| AMX tile | 🧪 optional path |
+## Version
 
-## Dispatch order (binary)
+Current release: **1.0.0**.
 
-AMX -> AVX-512 (blocked, tuned) -> AVX2 -> Scalar.
+## Build
 
-## Tuning API
+```bash
+cmake -S . -B build
+cmake --build build -j
+ctest --test-dir build --output-on-failure
+```
 
-`include/quantcore/blocking.hpp` exposes:
-- `current_blocking_strategy()`
-- `set_blocking_strategy(...)`
-- `reset_blocking_strategy()`
-- `autotune_blocking_binary(...)`
-
-## Benchmark + Roofline
+## Install
 
 ```bash
 cmake -S . -B build-release
 cmake --build build-release -j
-./build-release/bench_gemm bench/current_bench.json
-python3 bench/check_regression.py bench/regression_baseline.json bench/current_bench.json
+cmake --install build-release
 ```
 
-Benchmark outputs latency metrics, tuned tile sizes, memory bandwidth estimate, and memory-bound roofline throughput estimate.
+## Reproducible builds
+
+```bash
+export SOURCE_DATE_EPOCH=1700000000
+cmake -S . -B build-r1 -DQC_REPRODUCIBLE=ON
+cmake --build build-r1 -j
+```
+
+## Performance freeze baseline (binary 2048)
+
+See `bench/regression_baseline.json` and CI regression gate.
+
+## Deployment examples
+
+- C++: `examples/simple_inference.cpp`
+- Go: `examples/go_inference_example/main.go`
+
+## Release checklist (v1.0.0)
+
+- [x] C ABI frozen
+- [x] Shared/static packaging + pkg-config
+- [x] Sanitizer jobs configured
+- [x] Cross-platform CI matrix configured
+- [x] Go wrapper includes `BinaryGEMM`, `TernaryGEMM`, `Version`
+- [x] Reproducible build check configured

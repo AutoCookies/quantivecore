@@ -25,10 +25,3 @@ bool avx512vpopcntdq_supported();
 bool amx_tile_supported();
 
 }  // namespace quantcore
-
-extern "C" {
-
-void qc_binary_gemm(std::size_t m, std::size_t n, std::size_t k, const std::uint64_t* a_data,
-                    const std::uint64_t* b_data, std::int32_t* c_data);
-
-}

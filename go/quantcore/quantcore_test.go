@@ -17,18 +17,18 @@ func packBinary(vals []int8, rows, cols int) []uint64 {
 	return out
 }
 
-func TestBinaryGemm(t *testing.T) {
+func TestBinaryGEMMAndVersion(t *testing.T) {
+	if Version() != "1.0.0" {
+		t.Fatalf("unexpected version: %s", Version())
+	}
 	a := []int8{1, -1, 1, -1, -1, 1, -1, 1}
 	b := []int8{1, 1, -1, -1, -1, -1, 1, 1}
-
 	ap := packBinary(a, 2, 4)
 	bp := packBinary(b, 2, 4)
-
-	got, err := BinaryGemm(2, 2, 4, ap, bp)
+	got, err := BinaryGEMM(2, 2, 4, ap, bp)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
 	want := []int32{0, 0, 0, 0}
 	for i := range want {
 		if got[i] != want[i] {

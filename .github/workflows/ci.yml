@@ -5,35 +5,92 @@ on:
   pull_request:
 
 jobs:
-  build-test:
+  build-matrix:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            cxx: g++
+            avx512: ON
+          - os: ubuntu-latest
+            cxx: g++
+            avx512: OFF
+          - os: ubuntu-latest
+            cxx: clang++
+            avx512: OFF
+          - os: macos-latest
+            cxx: clang++
+            avx512: OFF
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} -DQC_ENABLE_AVX512=${{ matrix.avx512 }}
+      - name: Build
+        run: cmake --build build -j
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+  sanitizers-linux:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: ASAN+UBSAN
+        run: |
+          cmake -S . -B build-asan -DQUANTCORE_ENABLE_ASAN=ON -DQUANTCORE_ENABLE_UBSAN=ON -DQC_ENABLE_AVX512=OFF
+          cmake --build build-asan -j
+          ctest --test-dir build-asan --output-on-failure
 
-      - name: Install build deps
-        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build g++ golang-go python3
+  tsan-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: TSAN
+        run: |
+          cmake -S . -B build-tsan -DQUANTCORE_ENABLE_TSAN=ON -DQC_ENABLE_AVX512=OFF
+          cmake --build build-tsan -j
+          ctest --test-dir build-tsan --output-on-failure
 
-      - name: Configure ASAN
-        run: cmake -S . -B build -G Ninja -DQUANTCORE_ENABLE_ASAN=ON
-
-      - name: Build ASAN
-        run: cmake --build build
-
-      - name: Test ASAN
-        run: ctest --test-dir build --output-on-failure
-
-      - name: Configure release for Go and benchmarks
-        run: cmake -S . -B build-release -G Ninja -DQUANTCORE_ENABLE_ASAN=OFF
-
-      - name: Build release
-        run: cmake --build build-release
-
+  reproducible-and-go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build release for Go and bench
+        run: |
+          cmake -S . -B build-release -DQC_ENABLE_AVX512=OFF
+          cmake --build build-release -j
+          ctest --test-dir build-release --output-on-failure
       - name: Go tests
         run: |
           cd go
-          go test ./...
+          LD_LIBRARY_PATH=$GITHUB_WORKSPACE/build-release go test ./...
+      - name: ABI symbol freeze
+        run: |
+          nm -D --defined-only build-release/libquantcore.so | awk "{print $3}" | sort > /tmp/current_abi.txt
+          diff docs/ABI_SYMBOLS.txt /tmp/current_abi.txt
 
-      - name: Benchmark and regression gate
+      - name: Bench regression
         run: |
           ./build-release/bench_gemm bench/current_bench.json
           python3 bench/check_regression.py bench/regression_baseline.json bench/current_bench.json
+      - name: Reproducible build hash check
+        run: |
+          export SOURCE_DATE_EPOCH=1700000000
+          cmake -S . -B build-r1 -DQC_REPRODUCIBLE=ON -DQC_ENABLE_AVX512=OFF
+          cmake --build build-r1 -j
+          sha256sum build-r1/libquantcore.a > /tmp/hash1.txt
+          cmake -S . -B build-r2 -DQC_REPRODUCIBLE=ON -DQC_ENABLE_AVX512=OFF
+          cmake --build build-r2 -j
+          sha256sum build-r2/libquantcore.a > /tmp/hash2.txt
+          diff /tmp/hash1.txt /tmp/hash2.txt
+
+  version-check:
+    if: startsWith(github.ref, "refs/tags/v")
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate tag/version
+        run: |
+          TAG=${GITHUB_REF#refs/tags/v}
+          grep -q "kVersion = \"${TAG}\"" include/quantcore/version.hpp
