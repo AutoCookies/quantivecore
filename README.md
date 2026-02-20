@@ -1,63 +1,44 @@
 # QuantCore
 
-QuantCore is a bit-level linear algebra engine focused on binary (1-bit) and ternary (2-bit plane-packed) GEMM/GEMV.
+QuantCore is a bit-level GEMM/GEMV engine for binary (1-bit) and ternary (2-plane) math.
 
-## ISA Support Matrix
+## Phase 4 Highlights
 
-| ISA | Status | Notes |
-| --- | --- | --- |
-| Scalar C++20 | ✅ | Correctness reference path |
-| AVX2 | ✅ | Production fallback SIMD |
-| AVX-512F | ✅ | Runtime-dispatched fast path |
-| AVX-512VPOPCNTDQ | ✅ (if CPU supports) | Popcount acceleration for AVX-512 path |
-| AVX-512VNNI | ⚙️ optional | Reserved for future fused scoring path |
-| AMX tile | 🧪 experimental | Optional, isolated source path |
+- Runtime auto-tuner for cache blocking (`MB/NB/KB_blocks`) with deterministic median timing search.
+- Runtime micro-architecture profile capture in benchmark (`/proc/cpuinfo` model reporting).
+- Roofline-oriented reporting with arithmetic intensity + measured memory bandwidth probe.
+- Hardened dispatch path with explicit dimension validation and safe ISA fallback chain.
+- CI performance regression gate with latency ceilings and dominance checks.
 
-## Dispatch Behavior
+## ISA Matrix
 
-Runtime dispatch order for binary GEMM:
-1. AMX path when available.
-2. AVX-512F + AVX-512VPOPCNTDQ blocked kernel.
-3. AVX2 kernel.
-4. Scalar reference.
+| ISA | Status |
+| --- | --- |
+| Scalar | ✅ reference |
+| AVX2 | ✅ |
+| AVX-512F | ✅ |
+| AVX-512VPOPCNTDQ | ✅ when available |
+| AMX tile | 🧪 optional path |
 
-Ternary GEMM follows AVX-512 -> AVX2 -> Scalar.
+## Dispatch order (binary)
 
-Dispatch checks are guarded by `__builtin_cpu_supports` so unsupported systems never execute unsupported code.
+AMX -> AVX-512 (blocked, tuned) -> AVX2 -> Scalar.
 
-## Cache Blocking
+## Tuning API
 
-Blocked kernels use compile-time configurable tile sizes:
-- `QUANTCORE_BLOCK_MB` (default 64)
-- `QUANTCORE_BLOCK_NB` (default 64)
-- `QUANTCORE_BLOCK_KB_BLOCKS` (default 8 blocks of 64 elements)
+`include/quantcore/blocking.hpp` exposes:
+- `current_blocking_strategy()`
+- `set_blocking_strategy(...)`
+- `reset_blocking_strategy()`
+- `autotune_blocking_binary(...)`
 
-## NUMA / Threading
-
-Threaded execution partitions the M dimension deterministically and pins worker threads via Linux affinity when available.
-If NUMA/affinity APIs are unavailable, behavior gracefully falls back.
-
-## Build
-
-```bash
-cmake -S . -B build -DQUANTCORE_ENABLE_ASAN=ON
-cmake --build build -j
-ctest --test-dir build --output-on-failure
-```
-
-## Go Wrapper
+## Benchmark + Roofline
 
 ```bash
 cmake -S . -B build-release
 cmake --build build-release -j
-cd go && go test ./...
+./build-release/bench_gemm bench/current_bench.json
+python3 bench/check_regression.py bench/regression_baseline.json bench/current_bench.json
 ```
 
-## Performance Regression Guard
-
-CI runs:
-- `bench_gemm` with warmup + median timing
-- comparison against `bench/regression_baseline.json`
-- fails on >5% slowdown
-
-To disable AMX path at runtime, use hardware without AMX support (dispatch auto-falls back).
+Benchmark outputs latency metrics, tuned tile sizes, memory bandwidth estimate, and memory-bound roofline throughput estimate.

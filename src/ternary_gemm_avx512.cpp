@@ -71,7 +71,7 @@ std::int32_t dot_ternary_vpopcnt(const std::uint64_t* a_pos, const std::uint64_t
 void ternary_gemm_avx512(const PackedTernaryMatrix& a, const PackedTernaryMatrix& b, std::vector<std::int32_t>& c,
                          bool blocked) {
     c.assign(a.rows * b.rows, 0);
-    const BlockingStrategy strategy = default_blocking_strategy();
+    const BlockingStrategy strategy = current_blocking_strategy();
     const std::size_t mb = blocked ? strategy.mb : a.rows;
     const std::size_t nb = blocked ? strategy.nb : b.rows;
 

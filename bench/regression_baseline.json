@@ -1,8 +1,15 @@
 {
   "binary_2048": {
-    "scalar_ms": 9999.0,
-    "avx2_ms": 9999.0,
-    "dispatch_st_ms": 9999.0,
-    "dispatch_mt_ms": 9999.0
+    "scalar_ms": 800.0,
+    "avx2_ms": 220.0,
+    "avx512_naive_ms": 190.0,
+    "avx512_blocked_ms": 180.0,
+    "dispatch_st_ms": 250.0,
+    "dispatch_mt_ms": 150.0,
+    "memory_bw_gbps": 10.0,
+    "roofline_memory_gops": 5.0,
+    "tuned_mb": 64,
+    "tuned_nb": 64,
+    "tuned_kb_blocks": 8
   }
 }

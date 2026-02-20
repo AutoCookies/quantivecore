@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "quantcore/binary_gemm.hpp"
+#include "quantcore/blocking.hpp"
 
 namespace {
 
@@ -113,4 +114,26 @@ TEST_CASE("binary avx512 and amx match scalar", "[binary][avx512][amx]") {
         quantcore::binary_gemm_amx(pa, pb, amx);
         REQUIRE(amx == scalar);
     }
+}
+
+
+TEST_CASE("autotune updates strategy sanely", "[binary][tuning]") {
+    constexpr std::size_t m = 8;
+    constexpr std::size_t n = 8;
+    constexpr std::size_t k = 128;
+    std::vector<std::int8_t> a(m * k, 1);
+    std::vector<std::int8_t> b(n * k, -1);
+
+    const auto pa = quantcore::pack_binary_matrix(a, m, k);
+    const auto pb = quantcore::pack_binary_matrix(b, n, k);
+
+    const auto before = quantcore::current_blocking_strategy();
+    const auto tuned = quantcore::autotune_blocking_binary(pa, pb, 1, 1);
+    const auto after = quantcore::current_blocking_strategy();
+
+    REQUIRE(after.mb == tuned.mb);
+    REQUIRE(after.nb == tuned.nb);
+    REQUIRE(after.kb_blocks == tuned.kb_blocks);
+
+    quantcore::set_blocking_strategy(before);
 }

@@ -53,7 +53,7 @@ std::int32_t dot_binary_vpopcnt(const std::uint64_t* lhs, const std::uint64_t* r
 void binary_gemm_avx512(const PackedBinaryMatrix& a, const PackedBinaryMatrix& b, std::vector<std::int32_t>& c,
                         bool blocked) {
     c.assign(a.rows * b.rows, 0);
-    const BlockingStrategy strategy = default_blocking_strategy();
+    const BlockingStrategy strategy = current_blocking_strategy();
     const std::size_t mb = blocked ? strategy.mb : a.rows;
     const std::size_t nb = blocked ? strategy.nb : b.rows;
 

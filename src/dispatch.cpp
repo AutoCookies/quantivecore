@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <functional>
+#include <stdexcept>
 #include <vector>
 
 namespace quantcore {
@@ -45,6 +46,9 @@ bool amx_tile_supported() {
 }
 
 void binary_gemm(const PackedBinaryMatrix& a, const PackedBinaryMatrix& b, std::vector<std::int32_t>& c, bool use_threads) {
+    if (a.cols != b.cols || a.blocks_per_row != b.blocks_per_row) {
+        throw std::invalid_argument("binary_gemm dispatch: dimension mismatch");
+    }
     c.assign(a.rows * b.rows, 0);
     const bool use_avx512 = avx512f_supported() && avx512vpopcntdq_supported();
 
@@ -72,6 +76,9 @@ void binary_gemm(const PackedBinaryMatrix& a, const PackedBinaryMatrix& b, std::
 
 void ternary_gemm(const PackedTernaryMatrix& a, const PackedTernaryMatrix& b, std::vector<std::int32_t>& c,
                   bool use_threads) {
+    if (a.cols != b.cols || a.blocks_per_row != b.blocks_per_row) {
+        throw std::invalid_argument("ternary_gemm dispatch: dimension mismatch");
+    }
     c.assign(a.rows * b.rows, 0);
     const bool use_avx512 = avx512f_supported() && avx512vpopcntdq_supported();
 
