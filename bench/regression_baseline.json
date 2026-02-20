@@ -1,0 +1,8 @@
+{
+  "binary_2048": {
+    "scalar_ms": 9999.0,
+    "avx2_ms": 9999.0,
+    "dispatch_st_ms": 9999.0,
+    "dispatch_mt_ms": 9999.0
+  }
+}

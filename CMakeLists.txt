@@ -14,11 +14,17 @@ add_library(quantcore
     src/format.cpp
     src/binary_gemm_avx2.cpp
     src/ternary_gemm_avx2.cpp
+    src/binary_gemm_avx512.cpp
+    src/ternary_gemm_avx512.cpp
+    src/binary_gemm_amx.cpp
+    src/blocking_strategy.cpp
+    src/numa_threadpool.cpp
+    src/perf_counters.cpp
     src/dispatch.cpp
 )
 
 target_include_directories(quantcore PUBLIC include)
-target_compile_options(quantcore PRIVATE -Wall -Wextra -Werror)
+target_compile_options(quantcore PRIVATE -O3 -Wall -Wextra -Werror)
 
 if(QUANTCORE_ENABLE_ASAN)
     target_compile_options(quantcore PRIVATE -fsanitize=address -fno-omit-frame-pointer)
@@ -45,7 +51,7 @@ add_test(NAME quantcore_tests COMMAND quantcore_tests)
 
 add_executable(bench_gemm bench/bench_gemm.cpp)
 target_link_libraries(bench_gemm PRIVATE quantcore)
-target_compile_options(bench_gemm PRIVATE -Wall -Wextra -Werror)
+target_compile_options(bench_gemm PRIVATE -O3 -march=native -Wall -Wextra -Werror)
 if(QUANTCORE_ENABLE_ASAN)
     target_compile_options(bench_gemm PRIVATE -fsanitize=address -fno-omit-frame-pointer)
     target_link_options(bench_gemm PRIVATE -fsanitize=address)

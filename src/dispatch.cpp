@@ -1,10 +1,16 @@
 #include "quantcore/binary_gemm.hpp"
+#include "quantcore/blocking.hpp"
 #include "quantcore/ternary_gemm.hpp"
 
 #include <algorithm>
-#include <thread>
+#include <cstddef>
+#include <functional>
+#include <vector>
 
 namespace quantcore {
+
+void parallel_for_rows_numa(std::size_t rows, bool use_threads,
+                            const std::function<void(std::size_t, std::size_t)>& fn);
 
 bool avx2_supported() {
 #if defined(__x86_64__) || defined(_M_X64)
@@ -14,48 +20,47 @@ bool avx2_supported() {
 #endif
 }
 
-namespace {
-
-template <typename Fn>
-void parallel_rows(std::size_t rows, bool use_threads, Fn&& fn) {
-    const std::size_t hw = std::max<std::size_t>(1, std::thread::hardware_concurrency());
-    const std::size_t workers = use_threads ? std::min(rows, hw) : 1;
-
-    if (workers <= 1 || rows < 2) {
-        fn(0, rows);
-        return;
-    }
-
-    std::vector<std::thread> pool;
-    pool.reserve(workers);
-
-    const std::size_t chunk = (rows + workers - 1) / workers;
-    for (std::size_t t = 0; t < workers; ++t) {
-        const std::size_t begin = t * chunk;
-        const std::size_t end = std::min(rows, begin + chunk);
-        if (begin >= end) {
-            break;
-        }
-        pool.emplace_back([&, begin, end]() { fn(begin, end); });
-    }
-
-    for (auto& th : pool) {
-        th.join();
-    }
+bool avx512f_supported() {
+#if defined(__x86_64__) || defined(_M_X64)
+    return __builtin_cpu_supports("avx512f") != 0;
+#else
+    return false;
+#endif
 }
 
-}  // namespace
+bool avx512vpopcntdq_supported() {
+#if defined(__x86_64__) || defined(_M_X64)
+    return __builtin_cpu_supports("avx512vpopcntdq") != 0;
+#else
+    return false;
+#endif
+}
+
+bool amx_tile_supported() {
+#if defined(__x86_64__) || defined(_M_X64)
+    return __builtin_cpu_supports("amx-tile") != 0;
+#else
+    return false;
+#endif
+}
 
 void binary_gemm(const PackedBinaryMatrix& a, const PackedBinaryMatrix& b, std::vector<std::int32_t>& c, bool use_threads) {
     c.assign(a.rows * b.rows, 0);
+    const bool use_avx512 = avx512f_supported() && avx512vpopcntdq_supported();
 
-    parallel_rows(a.rows, use_threads, [&](std::size_t start, std::size_t finish) {
-        std::vector<std::int32_t> row_out;
+    parallel_for_rows_numa(a.rows, use_threads, [&](std::size_t start, std::size_t finish) {
         for (std::size_t i = start; i < finish; ++i) {
-            PackedBinaryMatrix one_row{1, a.cols, a.blocks_per_row,
+            PackedBinaryMatrix one_row{1,
+                                       a.cols,
+                                       a.blocks_per_row,
                                        std::vector<std::uint64_t>(a.data.begin() + static_cast<std::ptrdiff_t>(i * a.blocks_per_row),
                                                                   a.data.begin() + static_cast<std::ptrdiff_t>((i + 1) * a.blocks_per_row))};
-            if (avx2_supported()) {
+            std::vector<std::int32_t> row_out;
+            if (amx_tile_supported()) {
+                binary_gemm_amx(one_row, b, row_out);
+            } else if (use_avx512) {
+                binary_gemm_avx512(one_row, b, row_out, true);
+            } else if (avx2_supported()) {
                 binary_gemm_avx2(one_row, b, row_out);
             } else {
                 binary_gemm_scalar(one_row, b, row_out);
@@ -68,9 +73,9 @@ void binary_gemm(const PackedBinaryMatrix& a, const PackedBinaryMatrix& b, std::
 void ternary_gemm(const PackedTernaryMatrix& a, const PackedTernaryMatrix& b, std::vector<std::int32_t>& c,
                   bool use_threads) {
     c.assign(a.rows * b.rows, 0);
+    const bool use_avx512 = avx512f_supported() && avx512vpopcntdq_supported();
 
-    parallel_rows(a.rows, use_threads, [&](std::size_t start, std::size_t finish) {
-        std::vector<std::int32_t> row_out;
+    parallel_for_rows_numa(a.rows, use_threads, [&](std::size_t start, std::size_t finish) {
         for (std::size_t i = start; i < finish; ++i) {
             PackedTernaryMatrix one_row;
             one_row.rows = 1;
@@ -80,7 +85,11 @@ void ternary_gemm(const PackedTernaryMatrix& a, const PackedTernaryMatrix& b, st
                                                           a.positive.begin() + static_cast<std::ptrdiff_t>((i + 1) * a.blocks_per_row));
             one_row.negative = std::vector<std::uint64_t>(a.negative.begin() + static_cast<std::ptrdiff_t>(i * a.blocks_per_row),
                                                           a.negative.begin() + static_cast<std::ptrdiff_t>((i + 1) * a.blocks_per_row));
-            if (avx2_supported()) {
+
+            std::vector<std::int32_t> row_out;
+            if (use_avx512) {
+                ternary_gemm_avx512(one_row, b, row_out, true);
+            } else if (avx2_supported()) {
                 ternary_gemm_avx2(one_row, b, row_out);
             } else {
                 ternary_gemm_scalar(one_row, b, row_out);

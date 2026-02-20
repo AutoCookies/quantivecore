@@ -67,3 +67,30 @@ TEST_CASE("ternary avx2 and threaded match scalar", "[ternary][avx2]") {
         REQUIRE(avx2 == scalar);
     }
 }
+
+
+TEST_CASE("ternary avx512 blocked equals scalar", "[ternary][avx512]") {
+    constexpr std::size_t m = 8;
+    constexpr std::size_t n = 6;
+    constexpr std::size_t k = 255;
+
+    std::vector<std::int8_t> a(m * k, 0);
+    std::vector<std::int8_t> b(n * k, 0);
+    for (std::size_t i = 0; i < a.size(); ++i) { a[i] = (i % 5 == 0) ? 1 : ((i % 2 == 0) ? -1 : 0); }
+    for (std::size_t i = 0; i < b.size(); ++i) { b[i] = (i % 7 == 0) ? -1 : ((i % 3 == 0) ? 1 : 0); }
+
+    const auto pa = quantcore::pack_ternary_matrix(a, m, k);
+    const auto pb = quantcore::pack_ternary_matrix(b, n, k);
+
+    std::vector<std::int32_t> scalar;
+    quantcore::ternary_gemm_scalar(pa, pb, scalar);
+
+    if (quantcore::avx512f_supported() && quantcore::avx512vpopcntdq_supported()) {
+        std::vector<std::int32_t> naive;
+        std::vector<std::int32_t> blocked;
+        quantcore::ternary_gemm_avx512(pa, pb, naive, false);
+        quantcore::ternary_gemm_avx512(pa, pb, blocked, true);
+        REQUIRE(naive == scalar);
+        REQUIRE(blocked == scalar);
+    }
+}

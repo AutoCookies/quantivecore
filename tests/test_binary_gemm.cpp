@@ -81,3 +81,36 @@ TEST_CASE("binary avx2 and threaded match scalar", "[binary][avx2]") {
         REQUIRE(avx2 == scalar);
     }
 }
+
+
+TEST_CASE("binary avx512 and amx match scalar", "[binary][avx512][amx]") {
+    constexpr std::size_t m = 9;
+    constexpr std::size_t n = 10;
+    constexpr std::size_t k = 257;
+
+    std::vector<std::int8_t> a(m * k, 1);
+    std::vector<std::int8_t> b(n * k, -1);
+    for (std::size_t i = 0; i < a.size(); i += 2) { a[i] = -1; }
+    for (std::size_t i = 0; i < b.size(); i += 3) { b[i] = 1; }
+
+    const auto pa = quantcore::pack_binary_matrix(a, m, k);
+    const auto pb = quantcore::pack_binary_matrix(b, n, k);
+
+    std::vector<std::int32_t> scalar;
+    quantcore::binary_gemm_scalar(pa, pb, scalar);
+
+    if (quantcore::avx512f_supported() && quantcore::avx512vpopcntdq_supported()) {
+        std::vector<std::int32_t> naive;
+        std::vector<std::int32_t> blocked;
+        quantcore::binary_gemm_avx512(pa, pb, naive, false);
+        quantcore::binary_gemm_avx512(pa, pb, blocked, true);
+        REQUIRE(naive == scalar);
+        REQUIRE(blocked == scalar);
+    }
+
+    if (quantcore::amx_tile_supported()) {
+        std::vector<std::int32_t> amx;
+        quantcore::binary_gemm_amx(pa, pb, amx);
+        REQUIRE(amx == scalar);
+    }
+}

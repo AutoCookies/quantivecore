@@ -11,7 +11,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install build deps
-        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build g++ golang-go
+        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build g++ golang-go python3
 
       - name: Configure ASAN
         run: cmake -S . -B build -G Ninja -DQUANTCORE_ENABLE_ASAN=ON
@@ -22,7 +22,7 @@ jobs:
       - name: Test ASAN
         run: ctest --test-dir build --output-on-failure
 
-      - name: Configure release for Go
+      - name: Configure release for Go and benchmarks
         run: cmake -S . -B build-release -G Ninja -DQUANTCORE_ENABLE_ASAN=OFF
 
       - name: Build release
@@ -33,5 +33,7 @@ jobs:
           cd go
           go test ./...
 
-      - name: Benchmark smoke
-        run: ./build/bench_gemm
+      - name: Benchmark and regression gate
+        run: |
+          ./build-release/bench_gemm bench/current_bench.json
+          python3 bench/check_regression.py bench/regression_baseline.json bench/current_bench.json
