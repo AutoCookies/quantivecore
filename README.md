@@ -10,6 +10,7 @@
   [![CMake](https://img.shields.io/badge/build-CMake-064F8C?style=for-the-badge&logo=cmake&logoColor=white)](https://cmake.org/)
   [![Go Wrapper](https://img.shields.io/badge/wrapper-Go-00ADD8?style=for-the-badge&logo=go&logoColor=white)](go/)
   [![License](https://img.shields.io/badge/license-NC--OSL%20v1.0-blueviolet?style=for-the-badge)](LICENSE)
+  [![Discord](https://img.shields.io/badge/Discord-Join%20Server-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/nnkfW83n)
 </div>
 
 ---
